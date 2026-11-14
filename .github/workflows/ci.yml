@@ -790,7 +790,10 @@ jobs:
         # load time -- before any test runs -- on both the 24.04 (LLVM 20) and 26.04 (LLVM 21)
         # images. Openbox, because without a window manager SDL's fullscreen and display-mode
         # switches wait for a _NET_WM_STATE answer nobody gives, time out and revert: the
-        # display-size and Alt+Enter tests failed or hung on that, not on the game.
+        # display-size and Alt+Enter tests failed or hung on that, not on the game. 1920x1080
+        # because Xvfb offers its one screen size as the only display mode, and the display-size
+        # test starts from 800x600, 1600x900 and 2000x900: a screen of one of those left that
+        # start with nothing to switch to.
         env:
           LD_PRELOAD: libEGL_mesa.so.0 libGLX_mesa.so.0
           LIBGL_ALWAYS_SOFTWARE: "1"
@@ -799,7 +802,7 @@ jobs:
           LSAN_OPTIONS: suppressions=${{ github.workspace }}/cna-house/tools/ci/lsan.supp
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: |
-          xvfb-run -a --server-args="-screen 0 1600x900x24" sh -c '
+          xvfb-run -a --server-args="-screen 0 1920x1080x24" sh -c '
             openbox --sm-disable &
             wm=$!
             sleep 2
@@ -956,3 +959,13 @@ jobs:
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: xvfb-run -a --server-args="-screen 0 1600x900x24" tools/ci/run_tests.sh --preset render
+      # What the render tests drew (`*-actual.png`), to set beside tests/render/reference/ when a
+      # comparison fails: the log gives a differing fraction, not the picture.
+      - name: Upload the render outputs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: render-test-output
+          path: cna-house/build/test-output/
+          if-no-files-found: warn
+          retention-days: 14

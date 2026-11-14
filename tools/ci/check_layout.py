@@ -84,6 +84,8 @@ ALLOWED_ROOT_ENTRIES = {
     ".gitignore", ".gitattributes", ".clang-format", ".editorconfig",
     # `docs/versioning.md`'s release step writes it beside `VERSION` (HOUSE-02797).
     "CHANGELOG.md",
+    # The project's working rules from before the AI contribution policy took `AGENTS.md`.
+    "AI.md",
     # directories
     "docs", "include", "src", "tools", "tests", "assets-src", "content", "licenses",
     "android",

@@ -127,9 +127,9 @@ namespace cnahouse::app
 
         /// @brief Where `ContentManager` looks. Not a command-line option, deliberately.
         ///
-        /// The shell resolves this default against XNA's `TitleLocation` before constructing the
-        /// game, so shipping loads beside the executable even when its launcher has another working
-        /// directory. Tests can still inject their fixture roots directly through this field.
+        /// Relative, as XNA's: `TitleContainer` and `ContentManager` resolve it under the title
+        /// location, so shipping loads beside the executable even when its launcher has another
+        /// working directory. Tests can still inject their fixture roots directly through this field.
         /// Exposing it as a user-facing option would invite it to be used as one.
         std::string contentRoot = "content";
 

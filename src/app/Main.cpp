@@ -11,8 +11,6 @@
 #include <string>
 #include <utility>
 
-#include "Microsoft/Xna/Framework/TitleLocation.hpp"
-
 #include "cnahouse/app/CnaHouseGame.hpp"
 #include "cnahouse/app/CommandLine.hpp"
 #include "cnahouse/app/Settings.hpp"
@@ -48,25 +46,13 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    // ContentManager resolves a relative RootDirectory against the *process working directory*,
-    // while TitleContainer resolves the canonical world against XNA's title location. A launcher
-    // started from the repository root could therefore pair fresh build/content/world with stale
-    // repository-root content/Textures. Keep both content managers beside the executable, using
-    // the same XNA title base as TitleContainer, regardless of the launcher's working directory.
-    std::string titleDirectory = Microsoft::Xna::Framework::TitleLocation::getPathProperty();
-    if (!titleDirectory.empty() && titleDirectory.back() != '/' && titleDirectory.back() != '\\')
-    {
-        titleDirectory += '/';
-    }
-#if defined(__ANDROID__)
-    // Android's title is the APK: a relative root is what TitleContainer and ContentManager resolve
-    // among its assets, where no file path reaches (`HOUSE-03033`).
+    // Relative roots on every platform, as XNA's: TitleContainer and ContentManager both resolve a
+    // relative path under the title location, never the working directory, so a launcher started
+    // from the repository root cannot pair build/content/world with a stale content/Textures. On
+    // Android the title is the APK, which no file path reaches (`HOUSE-03033`). The absolute root
+    // this used to build came from TitleLocation, which is CNAEXT and therefore forbidden.
     options->contentRoot = "content";
     options->effectRoot = "content-fx";
-#else
-    options->contentRoot = titleDirectory + "content";
-    options->effectRoot = titleDirectory + "content-fx";
-#endif
 
     if (options->logCategories.has_value())
     {

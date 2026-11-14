@@ -842,7 +842,10 @@ TEST(CameraTuneTests, EveryDoorwayFramesItselfFromInsideTheRoomItOpensInto)
         const float room =
             std::max(ReachFrom(data, portal.cellA, portal), ReachFrom(data, portal.cellB, portal));
         const float margin = room - (fitsUseful < 0.0F ? 99.0F : fitsUseful);
-        if (fits < 0.0F || room < fits)
+        // `fits` is searched in 1 cm steps, so a door that fits from exactly the room's own depth is
+        // a tie, and the millimetre keeps float rounding from deciding it: three 2.40 m rooms whose
+        // doors fit from 2.40 m flipped when nothing but CNA's frustum arithmetic changed.
+        if (fits < 0.0F || room + 0.001F < fits)
         {
             ++notWholly;
         }
@@ -870,12 +873,12 @@ TEST(CameraTuneTests, EveryDoorwayFramesItselfFromInsideTheRoomItOpensInto)
     EXPECT_GT(doors, 20) << "§12's doors are what this measures, and there are 62 of them";
     EXPECT_GE(worstMargin, 0.0F) << tightest << ": its jambs and head do not fit from either room it joins";
     // Seeing the THRESHOLD as well costs another 1.68 m of standback -- the eye is that far above
-    // it -- and seven of the sixty-four openings are in rooms too small to give it: a WC 2.30 m
+    // it -- and six of the sixty-four openings are in rooms too small to give it: a WC 2.30 m
     // across cannot show a player the bottom of its own door frame. That is a fact about §12's
     // rooms rather than about §44's lens, and the part that does not fit is a line on the floor
     // under the player's feet. Counted rather than tolerated: if it changes, either the house or
     // the field of view has, and both are worth being told about.
-    EXPECT_LE(notWholly, 7) << "more openings than the seven recorded cannot be taken in whole";
+    EXPECT_LE(notWholly, 6) << "more openings than the six recorded cannot be taken in whole";
 }
 
 TEST(CameraTuneTests, TheTourOfEveryRoomKeepsTheViewInsideItsNumbers)

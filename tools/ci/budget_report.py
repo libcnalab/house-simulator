@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import struct
 import subprocess
@@ -184,6 +185,20 @@ def video_seconds(path: Path) -> float | Unknown:
         return Unknown(f"ffprobe returned {result.stdout.strip()!r}")
 
 
+def model_texture_children(model: Path) -> list[Path]:
+    """The Texture2D children CNA compiled beside a glTF Model, given its path without `.cnb`.
+
+    CNA builds every image a glTF's materials use as a child of its own, named under the Model
+    (`Models/car_tex0.png` for `Models/car`), whatever `generateChildAssets` says
+    (CNA-DEMOS-ISSUE-022). They are part of the Model's compiled output: its pack carries them, and
+    a Model that does not ship does not ship them either.
+    """
+    if not model.parent.is_dir():
+        return []
+    pattern = re.compile(re.escape(model.name) + r"_tex\d+\.[A-Za-z0-9]+\.cnb")
+    return sorted(p for p in model.parent.iterdir() if p.is_file() and pattern.fullmatch(p.name))
+
+
 def compiled_paths(row: dict, content: Path | None, effects: Path | None) -> list[Path]:
     """Where this asset's compiled form lives, or an empty list if no tree was given.
 
@@ -201,6 +216,8 @@ def compiled_paths(row: dict, content: Path | None, effects: Path | None) -> lis
     if content is None:
         return []
     paths = [content / f"{name}.cnb"]
+    if row.get("kind") == "model":
+        paths.extend(model_texture_children(content / name))
     if row.get("kind") == "video":
         source_suffix = Path(row.get("sourceFile", "")).suffix
         if source_suffix:
@@ -579,6 +596,14 @@ def selftest() -> int:
         # 11. Every unmeasured cell is accounted for in the report's own reasons table.
         require("## What could not be measured" in text and "not a PNG" in text,
                 "the report lists why each unmeasured cell is unmeasured")
+
+        # 12. A glTF Model's texture children are part of its compiled size; a look-alike is not.
+        (content / "Models" / "m_tex0.png.cnb").write_bytes(b"x" * 700)
+        (content / "Models" / "m_tex1.jpg.cnb").write_bytes(b"x" * 300)
+        (content / "Models" / "mm_tex0.png.cnb").write_bytes(b"x" * 9)
+        by_id = {r["id"]: r for r in measure(document, content, None)}
+        require(by_id["MODEL"]["compiledBytes"] == 4000,
+                f"a Model's _texN children count toward it ({by_id['MODEL']['compiledBytes']})")
 
     finally:
         MANIFEST = original_manifest

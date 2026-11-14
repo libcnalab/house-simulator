@@ -39,7 +39,7 @@ def unshipped(content: Path) -> set[Path]:
     Rows of a pack marked `shipped: false` (the `dev` fixtures of `--scene=content-smoke`) name
     their content. Rows marked `notPackaged` name none, so their output is found the way the build
     found the input: the source's path under `assets-src/` with `.cnb` for its suffix (`Media/`
-    builds into the root).
+    builds into the root), plus, for a glTF Model, the `_texN` texture children CNA builds beside it.
     """
     manifest = json.loads((REPO / "assets-src" / "assets.manifest.json").read_text())
     kept_packs = {pack["id"] for pack in manifest.get("packs", []) if pack.get("shipped")}
@@ -55,6 +55,9 @@ def unshipped(content: Path) -> set[Path]:
         if relative.parts[0] == "Media":
             relative = Path(*relative.parts[1:])
         outputs.add((content / relative).resolve())
+        if source.suffix.lower() in {".glb", ".gltf"}:
+            children = budget_report.model_texture_children(content / relative.with_suffix(""))
+            outputs.update(child.resolve() for child in children)
     return outputs
 
 

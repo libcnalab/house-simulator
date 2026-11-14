@@ -14,6 +14,7 @@
 
 #include "cnahouse/audio/WeatherPcm.hpp"
 #include "cnahouse/content/ContentRegistry.hpp"
+#include "cnahouse/util/ContentFile.hpp"
 #include "cnahouse/util/Log.hpp"
 #include "cnahouse/world/WorldTypes.hpp"
 
@@ -474,8 +475,15 @@ namespace cnahouse::audio
                 {
                     throw std::runtime_error("missing retained weather bank");
                 }
-                auto decoded =
-                    WeatherPcm::ReadFromTitle(std::string(contentRoot) + "/" + bank.contentName + ".cnb");
+                // The desktop content root is the absolute directory beside the executable, a path
+                // XNA's TitleContainer refuses; read it as the world loader does (`HOUSE-03033`).
+                const auto bytes =
+                    util::ReadContentBytes(std::string(contentRoot) + "/" + bank.contentName + ".cnb");
+                if (!bytes)
+                {
+                    throw std::runtime_error(bytes.Error().ToString());
+                }
+                auto decoded = WeatherPcm::Decode(bytes.Value());
                 if (!decoded)
                 {
                     throw std::runtime_error(decoded.Error().ToString());

@@ -247,8 +247,9 @@ namespace
                                 "wind-calm/Ambiance_Wind_Calm",
                                 "wind-forest/Ambiance_Wind_Forest"})
         {
-            auto pcm = WeatherPcm::ReadFromTitle(std::string(CNAHOUSE_TEST_CONTENT_ROOT) +
-                                                 "/Audio/ambience/" + name + "_Loop_Stereo.cnb");
+            // A title path: TitleContainer refuses a rooted one, as XNA's does.
+            auto pcm =
+                WeatherPcm::ReadFromTitle(std::string("content/Audio/ambience/") + name + "_Loop_Stereo.cnb");
             ASSERT_TRUE(pcm) << pcm.Error().ToString();
             const double before = PcmEnergy(*pcm);
             const float gain = pcm->LowPass(true);
@@ -271,18 +272,15 @@ namespace
 
     TEST(WeatherAudioTests, AuthoredBakeAndCoverMeetTheThreeRequiredListeningCases)
     {
-        const auto chunks = cnahouse::world::ChunkReader::ReadFromTitle(
-            std::string(CNAHOUSE_TEST_CONTENT_ROOT) + "/world/chunks.bin");
+        const auto chunks = cnahouse::world::ChunkReader::ReadFromTitle("content/world/chunks.bin");
         ASSERT_TRUE(chunks) << chunks.Error().ToString();
-        const auto sky = SkyExposure::ReadFromTitle(
-            std::string(CNAHOUSE_TEST_CONTENT_ROOT) + "/world/skyexposure.bin", chunks->worldHash);
+        const auto sky = SkyExposure::ReadFromTitle("content/world/skyexposure.bin", chunks->worldHash);
         ASSERT_TRUE(sky) << sky.Error().ToString();
         EXPECT_EQ(sky->CellCount(), chunks->cells.size());
-        const auto cover = cnahouse::weather::CoverageMask::ReadFromTitle(
-            std::string(CNAHOUSE_TEST_CONTENT_ROOT) + "/world/coverage.bin");
+        const auto cover = cnahouse::weather::CoverageMask::ReadFromTitle("content/world/coverage.bin");
         ASSERT_TRUE(cover) << cover.Error().ToString();
-        const auto collision = cnahouse::physics::CollisionLoader::ReadFromTitle(
-            std::string(CNAHOUSE_TEST_CONTENT_ROOT) + "/world/collision.bin");
+        const auto collision =
+            cnahouse::physics::CollisionLoader::ReadFromTitle("content/world/collision.bin");
         ASSERT_TRUE(collision) << collision.Error().ToString();
         const auto mix = [&](std::string_view id, float x, float eyeY, float z, float floorY)
         {

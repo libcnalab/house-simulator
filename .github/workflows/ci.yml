@@ -737,12 +737,45 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ninja-build ccache g++-14 ${{ env.CNA_SDL_BUILD_DEPS }} xvfb \
             libgl1-mesa-dev libegl1-mesa-dev libasound2-dev libpulse-dev \
-            libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libfreetype-dev
+            libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libfreetype-dev \
+            blender python3-numpy
       - name: Configure and build
         working-directory: cna-house
         run: |
           cmake --preset ${{ matrix.preset }}
           cmake --build --preset ${{ matrix.preset }} -j"$(nproc)"
+      # The same content the build jobs' tests read, from the same Blender (AM4-319). Without it a
+      # third of the integration tests and the world-reading unit tests found no files at all.
+      - name: Cache Blender 4.3.2
+        uses: actions/cache@v5
+        with:
+          path: ~/blender-4.3.2-linux-x64
+          key: blender-4.3.2-linux-x64
+      - name: Blender 4.3.2, the lint container's version
+        run: |
+          set -euo pipefail
+          if [ ! -x "$HOME/blender-4.3.2-linux-x64/blender" ]; then
+            url=https://download.blender.org/release/Blender4.3/blender-4.3.2-linux-x64.tar.xz
+            for attempt in 1 2 3; do
+              curl -fsSL -o "$RUNNER_TEMP/blender.tar.xz" "$url" && break
+              [ "$attempt" -lt 3 ] && sleep 15
+            done
+            echo "4da1c956673c0485e63054e563ee69198cc8f80d8157dd7592dffc8a6a5592e6  $RUNNER_TEMP/blender.tar.xz" \
+              | sha256sum -c -
+            tar -xJf "$RUNNER_TEMP/blender.tar.xz" -C "$HOME"
+          fi
+          "$HOME/blender-4.3.2-linux-x64/blender" --version | head -1
+          echo "CNAHOUSE_BLENDER=$HOME/blender-4.3.2-linux-x64/blender" >> "$GITHUB_ENV"
+      - name: The content the tests read
+        working-directory: cna-house
+        # The content tool is the sanitized build's own; its exit-time leaks are not what this
+        # job measures, and LLVM's allocator trips the mismatch check (see the step below).
+        env:
+          ASAN_OPTIONS: verify_asan_link_order=0:detect_leaks=0:alloc_dealloc_mismatch=0
+        run: |
+          python3 -m pip install --break-system-packages --user numpy pillow jsonschema
+          tools/ci/ci_content.sh ${{ matrix.preset }} \
+            build-${{ matrix.preset == 'linux-asan' && 'asan' || 'ubsan' }}
       - name: Unit and integration under the sanitizer
         working-directory: cna-house
         # ADR-0003 and HOUSE-00106 both note that sanitizer binaries in these projects reach
@@ -750,15 +783,23 @@ jobs:
         # HOUSE-02783: Mesa's drivers stay loaded, because memory a dlclose'd driver owned reads
         # as leaked with no frame to attribute it to; lsan.supp names the one third-party leak
         # left (Mesa GLX); and UBSan stops at its first report instead of printing and passing.
+        # These builds draw with OPENGLES3, so the integration tests need a display: Xvfb and
+        # Mesa's software rasteriser, as the render job has, and SDL's dummy audio device, as the
+        # headless job has. alloc_dealloc_mismatch=0: Mesa's libLLVM frees with free() what
+        # llvm::allocate_buffer took with aligned operator new, while registering its passes at
+        # load time -- before any test runs -- on both the 24.04 (LLVM 20) and 26.04 (LLVM 21)
+        # images.
         env:
           LD_PRELOAD: libEGL_mesa.so.0 libGLX_mesa.so.0
-          ASAN_OPTIONS: verify_asan_link_order=0
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          SDL_AUDIODRIVER: dummy
+          ASAN_OPTIONS: verify_asan_link_order=0:alloc_dealloc_mismatch=0
           LSAN_OPTIONS: suppressions=${{ github.workspace }}/cna-house/tools/ci/lsan.supp
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: |
-          tools/ci/run_tests.sh \
+          xvfb-run -a --server-args="-screen 0 1600x900x24" tools/ci/run_tests.sh \
             --test-dir build-${{ matrix.preset == 'linux-asan' && 'asan' || 'ubsan' }} \
-            -L 'unit|integration'
+            -L 'unit|integration' --timeout 900
 
   # --- HOUSE-02901 (manual) ----------------------------------------------------------------------
   web-smoke:
@@ -863,12 +904,41 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ninja-build ccache g++-14 ${{ env.CNA_SDL_BUILD_DEPS }} xvfb mesa-utils \
             libgl1-mesa-dev libegl1-mesa-dev libasound2-dev libpulse-dev \
-            libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libfreetype-dev
+            libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libfreetype-dev \
+            blender python3-numpy
       - name: Configure and build
         working-directory: cna-house
         run: |
           cmake --preset linux-release
           cmake --build --preset linux-release -j"$(nproc)"
+      # The same content the build jobs' tests read, from the same Blender (AM4-319). Without it
+      # there is no world/chunks.bin and no baked lightmaps: the walk scene fell back to its fixed
+      # camera, and the hall-atlas, season and HUD-readout tests failed on that, not on drawing.
+      - name: Cache Blender 4.3.2
+        uses: actions/cache@v5
+        with:
+          path: ~/blender-4.3.2-linux-x64
+          key: blender-4.3.2-linux-x64
+      - name: Blender 4.3.2, the lint container's version
+        run: |
+          set -euo pipefail
+          if [ ! -x "$HOME/blender-4.3.2-linux-x64/blender" ]; then
+            url=https://download.blender.org/release/Blender4.3/blender-4.3.2-linux-x64.tar.xz
+            for attempt in 1 2 3; do
+              curl -fsSL -o "$RUNNER_TEMP/blender.tar.xz" "$url" && break
+              [ "$attempt" -lt 3 ] && sleep 15
+            done
+            echo "4da1c956673c0485e63054e563ee69198cc8f80d8157dd7592dffc8a6a5592e6  $RUNNER_TEMP/blender.tar.xz" \
+              | sha256sum -c -
+            tar -xJf "$RUNNER_TEMP/blender.tar.xz" -C "$HOME"
+          fi
+          "$HOME/blender-4.3.2-linux-x64/blender" --version | head -1
+          echo "CNAHOUSE_BLENDER=$HOME/blender-4.3.2-linux-x64/blender" >> "$GITHUB_ENV"
+      - name: The content the tests read
+        working-directory: cna-house
+        run: |
+          python3 -m pip install --break-system-packages --user numpy pillow jsonschema
+          tools/ci/ci_content.sh linux-release build
       - name: Render tests
         working-directory: cna-house
         # A software rasteriser, so the numbers are reproducible and the job needs no GPU runner.

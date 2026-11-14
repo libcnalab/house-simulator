@@ -82,13 +82,16 @@ TEST(ClipFrustumTests, TheSixPlaneCaseIsBoundingFrustumForEveryBoxAndSphere)
                     const ContainmentType expected = xna.Contains(box);
                     ASSERT_EQ(mine.Contains(box), expected) << "box at (" << centre.X << ", " << centre.Y
                                                             << ", " << centre.Z << ") half " << half;
-                    EXPECT_EQ(mine.Intersects(box), xna.Intersects(box));
+                    // XNA's own `Intersects` is GJK, and its tolerance grows with the frustum: with
+                    // a 420 m far plane it reports a box a few metres outside one plane as touching.
+                    // The six-plane test is the answer XNA's `Contains` gives, and that is the claim.
+                    EXPECT_EQ(mine.Intersects(box), expected != ContainmentType::Disjoint);
 
                     const BoundingSphere sphere(centre, half);
                     ASSERT_EQ(mine.Contains(sphere), xna.Contains(sphere))
                         << "sphere at (" << centre.X << ", " << centre.Y << ", " << centre.Z << ") r "
                         << half;
-                    EXPECT_EQ(mine.Intersects(sphere), xna.Intersects(sphere));
+                    EXPECT_EQ(mine.Intersects(sphere), xna.Contains(sphere) != ContainmentType::Disjoint);
 
                     ++compared;
                     inside += expected == ContainmentType::Contains ? 1 : 0;

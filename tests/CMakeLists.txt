@@ -15,6 +15,18 @@ if(NOT TARGET gtest_main AND EXISTS "${_gtest_root}/CMakeLists.txt")
     set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     add_subdirectory("${_gtest_root}" GOOGLETEST EXCLUDE_FROM_ALL)
+    # A libcna.so consumer links with -z nocopyreloc -z text (CNA's cmake/SharedRuntimeLibrary.cmake),
+    # so every object in a test executable must be PIC. CNA turns CMAKE_POSITION_INDEPENDENT_CODE on
+    # only inside its own subtree, and GoogleTest is added here, outside it: built as plain PIE, its
+    # references to libc/libstdc++ data (stdout, basic_stringbuf's vtable) need copy relocations,
+    # which the linker then refuses as text relocations.
+    if(CNA_SHARED_LIBRARY)
+        foreach(_gtest_target gtest gtest_main gmock gmock_main)
+            if(TARGET ${_gtest_target})
+                set_target_properties(${_gtest_target} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+            endif()
+        endforeach()
+    endif()
 endif()
 
 if(NOT TARGET gtest_main)

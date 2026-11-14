@@ -156,7 +156,7 @@ are noticed failing.
 named an *installed* DejaVu Sans. `HOUSE-00200` replaced it with the vendored Noto `Fonts/ui-16` —
 an intended change, correctly made — and did not regenerate the reference. The fixture then
 disagreed with reality by **1.17 % of the frame (16 491 pixels, max channel delta 248)** for two
-commits, and nothing said so, because the render suite is nightly and no nightly ran in between.
+commits, and nothing said so, because the render suite was nightly and no nightly ran in between.
 The lesson is not "be careful": it is that **a change to a font, a shader or a clear colour is a
-reference change**, and the commit that makes it has to run the render suite rather than assume the
-nightly will.
+reference change**, and the commit that makes it has to run the render suite itself: CI runs it
+only when someone starts the workflow by hand.

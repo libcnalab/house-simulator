@@ -1,8 +1,9 @@
 # cna-house CI.
 #
 # The jobs mirror `plan.md` HOUSE-00133..HOUSE-00138 one for one, and the split is by COST rather
-# than by convenience: lint runs in seconds and gates every push, the sanitizer and render jobs are
-# nightly because they are slow and because a red nightly is a message rather than a blocked merge.
+# than by convenience: lint runs in seconds and gates every push, the sanitizer, render and Web
+# jobs and the stability run start only by hand (`workflow_dispatch`) because they are slow and
+# because a red manual run is a message rather than a blocked merge. Nothing runs on a schedule.
 #
 # `cna-house` builds against `../cna` and `../sharp-runtime` as SIBLING checkouts
 # (`cna-house.md` §8.1), so every build job checks all three out into that shape, on the branches
@@ -17,11 +18,8 @@ name: ci
 on:
   push:
   pull_request:
-  # The sanitizer and web jobs already admit a manual run; the trigger that allows one was missing.
+  # The only trigger of the sanitizer, render and Web jobs and of the stability run.
   workflow_dispatch:
-  schedule:
-    # Nightly, after most working days have ended in Europe.
-    - cron: "0 2 * * *"
 
 # Read-only: no job writes to the repository, its releases or its packages.
 permissions:
@@ -633,7 +631,7 @@ jobs:
         run: env -u DISPLAY -u WAYLAND_DISPLAY tools/ci/run_tests.sh --preset integration
 
       - name: Twenty-minute stability run
-        if: github.event_name == 'schedule'
+        if: github.event_name == 'workflow_dispatch'
         working-directory: cna-house
         # HOUSE-02598. The two production-collision walks repeat in long-lived processes so RSS
         # growth is meaningful; the report also proves the 60x weather cycle, settings writes and
@@ -643,7 +641,7 @@ jobs:
             tools/ci/run_stability.py --build-dir build-consumer \
               --report build-consumer/test-output/stability-report.json
       - name: Upload the stability report
-        if: always() && github.event_name == 'schedule'
+        if: always() && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: stability-report
@@ -710,10 +708,10 @@ jobs:
           done
           echo "OK: the CNAEXT engine layer is absent from the linked binary."
 
-  # --- HOUSE-00137 (nightly) ---------------------------------------------------------------------
+  # --- HOUSE-00137 (manual) ----------------------------------------------------------------------
   sanitizers:
     name: ${{ matrix.preset }}
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -762,10 +760,10 @@ jobs:
             --test-dir build-${{ matrix.preset == 'linux-asan' && 'asan' || 'ubsan' }} \
             -L 'unit|integration'
 
-  # --- HOUSE-02901 (nightly) ---------------------------------------------------------------------
+  # --- HOUSE-02901 (manual) ----------------------------------------------------------------------
   web-smoke:
     name: Web build + headless-Chrome smoke
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -840,10 +838,10 @@ jobs:
         if: always()
         with: { name: web-smoke-log, path: cna-house/build-consumer/web-smoke.log }
 
-  # --- HOUSE-00138 (nightly) ---------------------------------------------------------------------
+  # --- HOUSE-00138 (manual) ----------------------------------------------------------------------
   render-tests:
     name: render tests under Xvfb (OPENGLES3)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

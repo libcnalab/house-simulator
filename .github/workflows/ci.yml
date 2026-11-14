@@ -738,7 +738,7 @@ jobs:
           sudo apt-get install -y ninja-build ccache g++-14 ${{ env.CNA_SDL_BUILD_DEPS }} xvfb \
             libgl1-mesa-dev libegl1-mesa-dev libasound2-dev libpulse-dev \
             libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libfreetype-dev \
-            blender python3-numpy
+            blender python3-numpy openbox
       - name: Configure and build
         working-directory: cna-house
         run: |
@@ -788,7 +788,9 @@ jobs:
         # headless job has. alloc_dealloc_mismatch=0: Mesa's libLLVM frees with free() what
         # llvm::allocate_buffer took with aligned operator new, while registering its passes at
         # load time -- before any test runs -- on both the 24.04 (LLVM 20) and 26.04 (LLVM 21)
-        # images.
+        # images. Openbox, because without a window manager SDL's fullscreen and display-mode
+        # switches wait for a _NET_WM_STATE answer nobody gives, time out and revert: the
+        # display-size and Alt+Enter tests failed or hung on that, not on the game.
         env:
           LD_PRELOAD: libEGL_mesa.so.0 libGLX_mesa.so.0
           LIBGL_ALWAYS_SOFTWARE: "1"
@@ -797,9 +799,16 @@ jobs:
           LSAN_OPTIONS: suppressions=${{ github.workspace }}/cna-house/tools/ci/lsan.supp
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: |
-          xvfb-run -a --server-args="-screen 0 1600x900x24" tools/ci/run_tests.sh \
-            --test-dir build-${{ matrix.preset == 'linux-asan' && 'asan' || 'ubsan' }} \
-            -L 'unit|integration' --timeout 900
+          xvfb-run -a --server-args="-screen 0 1600x900x24" sh -c '
+            openbox --sm-disable &
+            wm=$!
+            sleep 2
+            status=0
+            tools/ci/run_tests.sh \
+              --test-dir build-${{ matrix.preset == 'linux-asan' && 'asan' || 'ubsan' }} \
+              -L "unit|integration" --timeout 900 || status=$?
+            kill "$wm" 2>/dev/null || true
+            exit "$status"'
 
   # --- HOUSE-02901 (manual) ----------------------------------------------------------------------
   web-smoke:

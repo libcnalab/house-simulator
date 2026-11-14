@@ -727,7 +727,11 @@ namespace cnahouse::world
         };
 
         std::vector<bool> values(m_nodes.size(), false);
-        std::vector<Frame> stack{{m_root, 0}};
+        // Not `stack{{m_root, 0}}`: under -fsanitize=undefined GCC 14 reports the initializer_list
+        // copy as an out-of-bounds memmove (-Werror=array-bounds), a false positive.
+        std::vector<Frame> stack;
+        stack.reserve(m_nodes.size());
+        stack.push_back(Frame{m_root, 0});
 
         const auto leaf = [&state, this](std::int32_t index) -> util::Result<StateValue>
         {

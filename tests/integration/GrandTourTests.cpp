@@ -393,7 +393,8 @@ namespace
         }
         for (unsigned int offset = 0; offset < std::size(angles); ++offset)
         {
-            const unsigned int index = (attempt + offset) % std::size(angles);
+            // Cast: under -fsanitize=undefined GCC no longer proves the remainder fits (-Wconversion).
+            const unsigned int index = static_cast<unsigned int>((attempt + offset) % std::size(angles));
             const float radians = angles[index] * 3.14159265358979323846F / 180.0F;
             const float distance =
                 baseDistance +

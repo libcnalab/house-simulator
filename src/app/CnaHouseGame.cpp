@@ -2014,7 +2014,10 @@ namespace cnahouse::app
             // or the window manager wants it (`HOUSE-00624`). One policy rather than three call
             // sites, because whichever ran last would otherwise have the final say.
             player::CaptureRequest capture;
-            capture.windowActive = getIsActiveProperty();
+            // A headless run has no window and no pointer to hold. Without a platform mouse CNA's
+            // GetState stays at (0, 0) whatever SetPosition asked for, so a captured cursor read
+            // the recentre itself as a 160-by-90-pixel look every frame and spun the camera.
+            capture.windowActive = getIsActiveProperty() && !options_.headless;
             capture.menuOpen = !menus_.Empty() || TouchHudVisible() || options_.screenshot.has_value() ||
                                filmingTour_.Active();
             capture.freeCursorHeld = Input().Current().freeCursorHeld;
